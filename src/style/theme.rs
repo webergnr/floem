@@ -106,7 +106,7 @@ style_debug_group!(
     view = margin_debug_view
 );
 
-pub use floem_style::DesignSystem;
+pub use super::design_system::DesignSystem;
 
 prop!(
     pub Theme: DesignSystem { inherited } = DesignSystem::light()

@@ -12,9 +12,10 @@ use floem_reactive::{RwSignal, SignalGet, SignalUpdate as _};
 use floem_renderer::Renderer;
 use floem_renderer::text::FontWeight;
 use floem_style::{
-    AffineLerp, Border, BorderColor, BorderRadius, BoxShadow, DesignSystem, InspectorRender,
-    Margin, Padding, PropDebugView, Transition,
+    AffineLerp, Border, BorderColor, BorderRadius, BoxShadow, InspectorRender, Margin, Padding,
+    PropDebugView, Transition,
 };
+use crate::style::design_system::DesignSystem;
 use parley::FontStyle;
 use peniko::color::palette;
 use peniko::kurbo::{self, Affine, Point, Rect, Stroke};
@@ -1189,16 +1190,23 @@ impl InspectorRender for FloemInspectorRender {
         Box::new(view)
     }
 
-    fn design_system(&self, ds: &DesignSystem) -> Box<dyn Any> {
+}
+
+/// Inspector preview for [`DesignSystem`]: an expandable panel listing
+/// colors and spacing. Defined here (floem core) rather than on the
+/// engine's `InspectorRender` trait because the widget body is
+/// floem-view-specific and the type itself is floem-specific.
+impl PropDebugView for DesignSystem {
+    fn debug_view(&self, r: &dyn InspectorRender) -> Option<Box<dyn Any>> {
         use crate::prelude::*;
         use crate::views::Stack;
 
-        let design_system = ds.clone();
+        let design_system = self.clone();
         let is_expanded = RwSignal::new(false);
 
         let color_swatch = |label: &str, color: Color| {
             let swatch: Box<dyn View> = color
-                .debug_view(self)
+                .debug_view(r)
                 .and_then(|any| any.downcast::<Box<dyn View>>().ok().map(|b| *b))
                 .unwrap();
             Stack::new((
@@ -1284,7 +1292,7 @@ impl InspectorRender for FloemInspectorRender {
         });
 
         let view: Box<dyn View> = content.into_any();
-        Box::new(view)
+        Some(Box::new(view))
     }
 }
 

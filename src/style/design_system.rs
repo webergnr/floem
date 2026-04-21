@@ -1,18 +1,19 @@
 //! Design system color and spacing primitives.
 //!
 //! [`DesignSystem`] holds the colors and dimensions that the built-in
-//! `floem` theme (light/dark modes) resolves from. The value type lives in
-//! `floem_style` so it can be referenced from inspector previews and
-//! interpolated alongside other style values. The `Theme` prop and the
-//! `StyleThemeExt` trait stay in `floem`.
-
-use std::any::Any;
+//! `floem` theme (light/dark modes) resolves from. It's floem-specific
+//! content — a second host would bring its own theme tokens — but the
+//! `Theme` prop (see [`super::theme`]) stores it as a `StylePropValue`,
+//! so the [`StylePropValue`] impl lives here so the cascade can
+//! interpolate it.
+//!
+//! The `PropDebugView` impl (builds the inspector preview widget)
+//! lives in [`super::inspector_render_impl`] next to the other
+//! view-building preview impls.
 
 use peniko::Color;
 
-use crate::debug_view::PropDebugView;
-use crate::inspector_render::InspectorRender;
-use crate::prop_value::StylePropValue;
+use floem_style::StylePropValue;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DesignSystem {
@@ -187,8 +188,3 @@ impl StylePropValue for DesignSystem {
     }
 }
 
-impl PropDebugView for DesignSystem {
-    fn debug_view(&self, r: &dyn InspectorRender) -> Option<Box<dyn Any>> {
-        Some(r.design_system(self))
-    }
-}

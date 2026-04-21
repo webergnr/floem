@@ -54,7 +54,6 @@ pub mod cascade;
 pub mod components;
 pub mod context_value;
 pub mod debug_view;
-pub mod design_system;
 pub mod easing;
 pub mod extractors;
 pub mod inspector_render;
@@ -66,7 +65,7 @@ pub mod props;
 pub mod recalc;
 pub mod responsive;
 pub mod selectors;
-pub mod sink;
+pub mod cascade_inputs;
 pub mod style;
 // Holds only `#[macro_export]` macros, which surface at the crate root;
 // no user needs to name this module directly.
@@ -112,7 +111,6 @@ pub use cascade::resolve_nested_maps;
 pub use components::{Border, BorderColor, BorderRadius, BoxShadow, Margin, Padding};
 pub use context_value::ContextValue;
 pub use debug_view::PropDebugView;
-pub use design_system::DesignSystem;
 pub use easing::{Bezier, Easing, Linear, Spring, Step, StepPosition};
 pub use extractors::{FontProps, LayoutProps, TransformProps, ViewStyleProps};
 pub use inspector_render::InspectorRender;
@@ -128,7 +126,7 @@ pub use props::{
     StyleKeyInfo, StyleProp, StylePropInfo, StylePropRef, RESPONSIVE_SELECTORS_INFO,
     STRUCTURAL_SELECTORS_INFO,
 };
-pub use sink::{AnimationBackend, CascadeInputs, NoAnimationBackend, PerNodeInteraction};
+pub use cascade_inputs::{AnimationBackend, CascadeInputs, NoAnimationBackend, PerNodeInteraction};
 pub use style::{BuiltinStyle, ContextRef, DeferredStyleEffect, ExprStyle, Style};
 pub use style_value::{StyleMapValue, StyleValue};
 pub use transition::{ActiveTransition, DirectTransition, Transition, TransitionState};

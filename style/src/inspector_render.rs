@@ -20,7 +20,6 @@ use peniko::kurbo::{Affine, Rect, Stroke};
 use peniko::{Brush, Color, Gradient};
 
 use crate::components::{Border, BorderColor, BorderRadius, BoxShadow, Margin, Padding};
-use crate::design_system::DesignSystem;
 use crate::transition::Transition;
 use crate::values::{ObjectFit, ObjectPosition};
 
@@ -99,7 +98,4 @@ pub trait InspectorRender {
 
     /// Preview for a [`BoxShadow`]: a shadowed rectangle with a details tooltip.
     fn box_shadow(&self, s: &BoxShadow) -> Box<dyn Any>;
-
-    /// Preview for a [`DesignSystem`]: expandable panel listing colors and spacing.
-    fn design_system(&self, ds: &DesignSystem) -> Box<dyn Any>;
 }

@@ -1425,7 +1425,7 @@ impl WindowState {
             // whole. The animation backend stays a small stack value
             // that borrows the reverse map read-only.
             let reverse_map = &self.style_node_to_view;
-            let anim_backend = crate::style::sink::FloemAnimationBackend {
+            let anim_backend = crate::style::animation_backend::FloemAnimationBackend {
                 style_node_to_view: reverse_map,
             };
             let interactions =

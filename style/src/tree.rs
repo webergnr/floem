@@ -35,7 +35,7 @@ use crate::interaction::{InheritedInteractionCx, InteractionState};
 use crate::props::StyleClassRef;
 use crate::recalc::StyleReason;
 use crate::selectors::{StyleSelector, StyleSelectors};
-use crate::sink::CascadeInputs;
+use crate::cascade_inputs::CascadeInputs;
 use crate::style::Style;
 
 new_key_type! {
