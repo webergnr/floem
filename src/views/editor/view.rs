@@ -967,7 +967,7 @@ impl View for EditorView {
         let mut transitioning = false;
         self.editor.with_untracked(|ed| {
             ed.es.update(|s| {
-                if s.read(cx, &mut transitioning) {
+                if s.read(cx.extractor_cx(), &mut transitioning) {
                     ed.floem_style_id.update(|val| *val += 1);
                     cx.window_state.request_paint(self.id());
                 }

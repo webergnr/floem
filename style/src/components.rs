@@ -1,18 +1,13 @@
 //! Composite style value types.
 //!
 //! This module provides multi-value style types like [`Border`], [`Padding`],
-//! [`Margin`], and [`BoxShadow`]. They are data types only. The
-//! `PropDebugView` impls delegate to [`crate::InspectorRender`] for the
-//! actual widget construction, so the view code stays in the `floem` crate.
-
-use std::any::Any;
+//! [`Margin`], and [`BoxShadow`]. They are data types only; their inspector
+//! previews live in the `floem` crate.
 
 use peniko::color::palette;
 use peniko::kurbo::Stroke;
 use peniko::{Brush, Color};
 
-use crate::debug_view::PropDebugView;
-use crate::inspector_render::InspectorRender;
 use crate::prop_value::StylePropValue;
 use crate::unit::{FontSizeCx, Length, LengthAuto};
 use crate::values::StrokeWrap;
@@ -588,38 +583,3 @@ impl StylePropValue for Margin {
     }
 }
 
-impl PropDebugView for Border {
-    fn debug_view(&self, r: &dyn InspectorRender) -> Option<Box<dyn Any>> {
-        Some(r.border(self))
-    }
-}
-
-impl PropDebugView for BorderColor {
-    fn debug_view(&self, r: &dyn InspectorRender) -> Option<Box<dyn Any>> {
-        Some(r.border_color(self))
-    }
-}
-
-impl PropDebugView for BorderRadius {
-    fn debug_view(&self, r: &dyn InspectorRender) -> Option<Box<dyn Any>> {
-        Some(r.border_radius(self))
-    }
-}
-
-impl PropDebugView for Padding {
-    fn debug_view(&self, r: &dyn InspectorRender) -> Option<Box<dyn Any>> {
-        Some(r.padding(self))
-    }
-}
-
-impl PropDebugView for Margin {
-    fn debug_view(&self, r: &dyn InspectorRender) -> Option<Box<dyn Any>> {
-        Some(r.margin(self))
-    }
-}
-
-impl PropDebugView for BoxShadow {
-    fn debug_view(&self, r: &dyn InspectorRender) -> Option<Box<dyn Any>> {
-        Some(r.box_shadow(self))
-    }
-}

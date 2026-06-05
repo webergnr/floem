@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::sync::LazyLock;
 use std::time::Duration;
 
 use super::unit::{DurationUnitExt, UnitExt};
@@ -25,9 +27,7 @@ use smallvec::smallvec;
 style_class!(pub HoverTargetClass);
 
 fn debug_view_of<T: PropDebugView>(value: T) -> Option<Box<dyn View>> {
-    value
-        .debug_view(&FloemInspectorRender)
-        .and_then(|any| any.downcast::<Box<dyn View>>().ok().map(|b| *b))
+    value.debug_view()
 }
 
 fn border_debug_view(style: &Style) -> Option<Box<dyn View>> {
@@ -78,33 +78,64 @@ fn margin_debug_view(style: &Style) -> Option<Box<dyn View>> {
 style_debug_group!(
     pub BorderDebugGroup,
     inherited = inherited,
-    members = [BorderLeft, BorderTop, BorderRight, BorderBottom],
-    view = border_debug_view
+    members = [BorderLeft, BorderTop, BorderRight, BorderBottom]
 );
 style_debug_group!(
     pub BorderColorDebugGroup,
     inherited = inherited,
-    members = [BorderLeftColor, BorderTopColor, BorderRightColor, BorderBottomColor],
-    view = border_color_debug_view
+    members = [BorderLeftColor, BorderTopColor, BorderRightColor, BorderBottomColor]
 );
 style_debug_group!(
     pub BorderRadiusDebugGroup,
     inherited = inherited,
-    members = [BorderTopLeftRadius, BorderTopRightRadius, BorderBottomLeftRadius, BorderBottomRightRadius],
-    view = border_radius_debug_view
+    members = [BorderTopLeftRadius, BorderTopRightRadius, BorderBottomLeftRadius, BorderBottomRightRadius]
 );
 style_debug_group!(
     pub PaddingDebugGroup,
     inherited = inherited,
-    members = [PaddingLeft, PaddingTop, PaddingRight, PaddingBottom],
-    view = padding_debug_view
+    members = [PaddingLeft, PaddingTop, PaddingRight, PaddingBottom]
 );
 style_debug_group!(
     pub MarginDebugGroup,
     inherited = inherited,
-    members = [MarginLeft, MarginTop, MarginRight, MarginBottom],
-    view = margin_debug_view
+    members = [MarginLeft, MarginTop, MarginRight, MarginBottom]
 );
+
+type GroupPreviewFn = fn(&Style) -> Option<Box<dyn View>>;
+
+/// Maps each debug-group marker (by its `type_name`) to the floem function
+/// that builds its inspector preview. `floem_style` carries only the group's
+/// members; the preview itself lives here in floem.
+static GROUP_PREVIEWS: LazyLock<HashMap<&'static str, GroupPreviewFn>> = LazyLock::new(|| {
+    HashMap::from([
+        (
+            std::any::type_name::<BorderDebugGroup>(),
+            border_debug_view as GroupPreviewFn,
+        ),
+        (
+            std::any::type_name::<BorderColorDebugGroup>(),
+            border_color_debug_view as GroupPreviewFn,
+        ),
+        (
+            std::any::type_name::<BorderRadiusDebugGroup>(),
+            border_radius_debug_view as GroupPreviewFn,
+        ),
+        (
+            std::any::type_name::<PaddingDebugGroup>(),
+            padding_debug_view as GroupPreviewFn,
+        ),
+        (
+            std::any::type_name::<MarginDebugGroup>(),
+            margin_debug_view as GroupPreviewFn,
+        ),
+    ])
+});
+
+/// Look up a debug group's inspector preview builder by its `type_name`
+/// (as produced by `StyleDebugGroupInfo::name`).
+pub(crate) fn group_preview(name: &str) -> Option<GroupPreviewFn> {
+    GROUP_PREVIEWS.get(name).copied()
+}
 
 pub use super::design_system::DesignSystem;
 

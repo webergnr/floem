@@ -1,13 +1,11 @@
 //! Value types for style properties.
 //!
 //! These types are the pure data counterparts of values used in the Floem
-//! style system. Their inspector `PropDebugView` impls remain in `floem`
-//! because they reference `crate::view::View`.
+//! style system. Their inspector previews live in the `floem` crate.
 
 use parley::style::{OverflowWrap, WordBreakStrength};
 use peniko::kurbo::Stroke;
 
-use crate::debug_view::PropDebugView;
 use crate::prop_value::{StylePropValue, hash_value};
 use crate::unit::Length;
 
@@ -169,7 +167,6 @@ impl StylePropValue for CursorStyle {
         h.finish()
     }
 }
-impl PropDebugView for CursorStyle {}
 
 impl StylePropValue for TextOverflow {
     fn content_hash(&self) -> u64 {
@@ -179,7 +176,6 @@ impl StylePropValue for TextOverflow {
         h.finish()
     }
 }
-impl PropDebugView for TextOverflow {}
 
 impl StylePropValue for PointerEvents {
     fn content_hash(&self) -> u64 {
@@ -189,7 +185,6 @@ impl StylePropValue for PointerEvents {
         h.finish()
     }
 }
-impl PropDebugView for PointerEvents {}
 
 /// Controls whether and how a view can receive focus.
 ///
@@ -283,4 +278,3 @@ impl StylePropValue for Focus {
         h.finish()
     }
 }
-impl PropDebugView for Focus {}

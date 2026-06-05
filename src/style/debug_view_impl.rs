@@ -1,9 +1,10 @@
 //! Inspector debug-view implementation for [`Style`].
 //!
 //! Builds the tabbed properties/selectors/classes tree shown in the Floem
-//! inspector. Counterpart to [`super::inspector_render_impl`] — that file
-//! implements per-prop previews via the `InspectorRender` trait, while this
-//! file assembles those previews into the top-level style debug view.
+//! inspector. Each prop's value preview is looked up by stored type via
+//! [`super::prop_preview`] (whose builders live in
+//! [`super::inspector_render_impl`]); this file assembles those previews into
+//! the top-level style debug view.
 
 use floem_reactive::{RwSignal, SignalGet, SignalUpdate as _};
 use std::collections::HashSet;
@@ -27,9 +28,7 @@ use super::{
 
 // Primitive, taffy, collection, peniko, text, and unit `StylePropValue` impls
 // live in `floem_style::value_impls` (moved there to satisfy the orphan rule).
-// `PropDebugView` impls for types owned by external crates
-// (Option, Vec, SmallVec, MinMax, Line, FontWeight, FontStyle, primitives via
-// `no_debug_view!`) likewise live in `floem_style::value_impls`.
+// Their inspector previews live in floem's `prop_preview` module.
 
 pub(crate) fn views(views: impl ViewTuple) -> Vec<AnyView> {
     views.into_views()
@@ -196,11 +195,13 @@ fn style_debug_prop_row(
     let name = short_style_name(&format!("{:?}", prop.key));
     StyleDebugRow {
         render: Rc::new(move |_| {
-            let mut value_view = (prop.info().debug_view)(
-                &*value,
-                &crate::style::FloemInspectorRender,
-            )
-            .and_then(|any| any.downcast::<Box<dyn View>>().ok().map(|b| *b))
+            let mut value_view = match (prop.info().value_as_any)(&*value) {
+                floem_style::PropValueRef::Val(inner) => {
+                    crate::style::prop_preview::lookup(inner.type_id()).and_then(|f| f(inner))
+                }
+                floem_style::PropValueRef::Context => Some(Label::new("Context(..)").into_any()),
+                floem_style::PropValueRef::Unset => Some(Label::new("Unset").into_any()),
+            }
             .unwrap_or_else(|| Label::new((prop.info().debug_any)(&*value)).into_any());
 
             if let Some(transition) = style
@@ -377,14 +378,15 @@ fn style_debug_prop_rows(
             continue;
         }
         hidden_props.extend(present);
-        if (info.debug_view)(style as &dyn std::any::Any).is_some() {
-            let info = info.clone();
+        let name = (info.name)();
+        if let Some(preview) = crate::theme::group_preview(name)
+            && preview(style).is_some()
+        {
             let style = style.clone();
             rows.push(style_debug_group_row(
-                short_style_name((info.name)()),
+                short_style_name(name),
                 move || {
-                    (info.debug_view)(&style as &dyn std::any::Any)
-                        .and_then(|any| any.downcast::<Box<dyn View>>().ok().map(|b| *b))
+                    preview(&style)
                         .unwrap_or_else(|| Label::new("empty").into_any())
                         .into_any()
                 },

@@ -326,7 +326,7 @@ impl Handle {
         let mut transitioning = false;
         if self
             .handle_style
-            .read_style(cx, &resolved, &mut transitioning)
+            .read_style(cx.extractor_cx(), &resolved, &mut transitioning)
         {
             let cursor = match axis {
                 Axis::Horizontal => CursorStyle::ColResize,
@@ -393,7 +393,7 @@ impl View for Resizable {
     fn style_pass(&mut self, cx: &mut crate::context::StyleCx<'_>) {
         let mut transitioning = false;
         if cx.reason.flags != StyleReasonFlags::TARGET {
-            self.re_style.read(cx, &mut transitioning);
+            self.re_style.read(cx.extractor_cx(), &mut transitioning);
         }
         if transitioning {
             cx.request_transition();

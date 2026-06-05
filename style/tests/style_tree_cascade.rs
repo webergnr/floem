@@ -15,7 +15,7 @@ use floem_style::builtin_props::{Background, FontSize, TextColor};
 use floem_style::props::StyleClass;
 use floem_style::responsive::ScreenSizeBp;
 use floem_style::{
-    CascadeInputs, NoAnimationBackend, PerNodeInteraction, Style, StyleNodeId, StyleTree,
+    CascadeInputs, InteractionState, PerNodeInteraction, Style, StyleNodeId, StyleTree,
     recalc::StyleReason, style_class,
 };
 use peniko::color::palette::css;
@@ -38,21 +38,32 @@ impl MockHost {
     }
 }
 
+/// A host animation hook: ticks `node`'s animations into `combined` /
+/// `interact`, returning whether the animation is still active.
+type AnimHook = fn(StyleNodeId, &mut Style, &mut InteractionState) -> bool;
+
+/// No-op animation hook for cascade tests that don't exercise animations.
+fn no_animations(_: StyleNodeId, _: &mut Style, _: &mut InteractionState) -> bool {
+    false
+}
+
 /// Build a fresh `CascadeInputs` for this pass. Using a function keeps
 /// the closures' lifetimes scoped to one call.
-fn cascade<'a>(host: &'a MockHost) -> (Box<dyn Fn(StyleNodeId) -> PerNodeInteraction + 'a>, NoAnimationBackend) {
+fn cascade<'a>(
+    host: &'a MockHost,
+) -> (Box<dyn Fn(StyleNodeId) -> PerNodeInteraction + 'a>, AnimHook) {
     let interactions: Box<dyn Fn(StyleNodeId) -> PerNodeInteraction + 'a> =
         Box::new(|node: StyleNodeId| PerNodeInteraction {
             is_hovered: host.hovered.contains(&node),
             ..Default::default()
         });
-    (interactions, NoAnimationBackend)
+    (interactions, no_animations)
 }
 
 fn inputs<'a>(
     host: &'a MockHost,
     interactions: &'a dyn Fn(StyleNodeId) -> PerNodeInteraction,
-    animations: &'a NoAnimationBackend,
+    animations: &'a dyn Fn(StyleNodeId, &mut Style, &mut InteractionState) -> bool,
 ) -> CascadeInputs<'a> {
     CascadeInputs {
         frame_start: Instant::now(),

@@ -32,7 +32,7 @@
 //! A host drives the engine by:
 //! 1. Building a [`CascadeInputs`] each frame describing the viewport
 //!    (frame time, screen size, dark-mode flag), per-node interaction state,
-//!    and an [`AnimationBackend`].
+//!    and an [`animations`](CascadeInputs::animations) tick hook.
 //! 2. Allocating a [`StyleNodeId`] per element via [`StyleTree::new_node`]
 //!    and wiring parent/children edges.
 //! 3. Pushing direct styles and classes via
@@ -53,10 +53,8 @@ pub mod cache;
 pub mod cascade;
 pub mod components;
 pub mod context_value;
-pub mod debug_view;
 pub mod easing;
 pub mod extractors;
-pub mod inspector_render;
 pub mod interaction;
 pub mod merge_id;
 pub mod prop_reader;
@@ -110,10 +108,8 @@ pub use cache::{CacheHit, CacheStats, StyleCache, StyleCacheKey};
 pub use cascade::resolve_nested_maps;
 pub use components::{Border, BorderColor, BorderRadius, BoxShadow, Margin, Padding};
 pub use context_value::ContextValue;
-pub use debug_view::PropDebugView;
 pub use easing::{Bezier, Easing, Linear, Spring, Step, StepPosition};
 pub use extractors::{FontProps, LayoutProps, TransformProps, ViewStyleProps};
-pub use inspector_render::InspectorRender;
 pub use interaction::{InheritedInteractionCx, InteractionState};
 pub use merge_id::{
     combine_merge_ids, next_style_merge_id, DEFERRED_EFFECTS_INFO, DEFERRED_EFFECTS_KEY,
@@ -121,12 +117,12 @@ pub use merge_id::{
 pub use prop_reader::{ExtractorField, PropExtractorCx};
 pub use prop_value::StylePropValue;
 pub use props::{
-    EqAnyFn, HashAnyFn, InterpolateFn, ResolveInheritedAnyFn, StyleClass, StyleClassInfo,
-    StyleClassRef, StyleDebugGroup, StyleDebugGroupInfo, StyleDebugGroupRef, StyleKey,
-    StyleKeyInfo, StyleProp, StylePropInfo, StylePropRef, RESPONSIVE_SELECTORS_INFO,
+    EqAnyFn, HashAnyFn, InterpolateFn, PropValueRef, ResolveInheritedAnyFn, StyleClass,
+    StyleClassInfo, StyleClassRef, StyleDebugGroup, StyleDebugGroupInfo, StyleDebugGroupRef,
+    StyleKey, StyleKeyInfo, StyleProp, StylePropInfo, StylePropRef, RESPONSIVE_SELECTORS_INFO,
     STRUCTURAL_SELECTORS_INFO,
 };
-pub use cascade_inputs::{AnimationBackend, CascadeInputs, NoAnimationBackend, PerNodeInteraction};
+pub use cascade_inputs::{CascadeInputs, PerNodeInteraction};
 pub use style::{BuiltinStyle, ContextRef, DeferredStyleEffect, ExprStyle, Style};
 pub use style_value::{StyleMapValue, StyleValue};
 pub use transition::{ActiveTransition, DirectTransition, Transition, TransitionState};

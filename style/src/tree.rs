@@ -112,8 +112,8 @@ pub struct StyleNode {
     /// into `combined_style` before the result is propagated to children.
     ///
     /// A host may either push animations here directly (standalone
-    /// hosts, tests) or keep its own registry and implement
-    /// [`AnimationBackend`](crate::AnimationBackend); both paths
+    /// hosts, tests) or keep its own registry and tick it through the
+    /// [`animations`](crate::CascadeInputs::animations) hook; both paths
     /// coexist and are invoked in order each frame.
     pub(crate) animations: SmallVec<[Animation; 1]>,
 
@@ -676,7 +676,7 @@ impl StyleTree {
     /// selectors + inherited context into `combined_style` /
     /// `computed_style`, derives the child-facing `inherited_context`
     /// and `class_context`, ticks tree-stored animations and the host's
-    /// optional [`AnimationBackend`](crate::AnimationBackend), and
+    /// optional [`animations`](crate::CascadeInputs::animations) hook, and
     /// records all side-effects (fixed-element transitions, scheduled
     /// reruns, dirtied descendants, layout invalidations, animation
     /// events) in tree-owned state.
@@ -888,9 +888,7 @@ impl StyleTree {
         };
 
         let backend_has_active =
-            inputs
-                .animations
-                .apply(id, &mut combined_style, &mut interact_state);
+            (inputs.animations)(id, &mut combined_style, &mut interact_state);
 
         if tree_has_active || backend_has_active {
             self.schedule(id, StyleReason::animation());

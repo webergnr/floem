@@ -1,9 +1,7 @@
-//! Concrete `InspectorRender` implementation that builds `floem` view
-//! widgets. The `PropDebugView` impls for types owned by `floem_style`
-//! (Color, Gradient, Brush, Stroke, Rect, Affine, ObjectFit,
-//! ObjectPosition, Transition) delegate their widget-building to the
-//! methods on this struct; the bodies here are the same view code that
-//! previously lived inline on each `PropDebugView` impl.
+//! Inspector preview widget builders. The [`PropDebugView`](crate::style::PropDebugView)
+//! impls in `prop_preview.rs` delegate their widget construction to the
+//! methods on [`FloemInspectorRender`] (color swatches, gradient/stroke/affine
+//! canvases, border/padding rows, box-shadow tooltips, etc.).
 
 use std::any::Any;
 use std::time::Duration;
@@ -12,10 +10,10 @@ use floem_reactive::{RwSignal, SignalGet, SignalUpdate as _};
 use floem_renderer::Renderer;
 use floem_renderer::text::FontWeight;
 use floem_style::{
-    AffineLerp, Border, BorderColor, BorderRadius, BoxShadow, InspectorRender, Margin, Padding,
-    PropDebugView, Transition,
+    AffineLerp, Border, BorderColor, BorderRadius, BoxShadow, Margin, Padding, Transition,
 };
 use crate::style::design_system::DesignSystem;
+use crate::style::PropDebugView;
 use parley::FontStyle;
 use peniko::color::palette;
 use peniko::kurbo::{self, Affine, Point, Rect, Stroke};
@@ -29,9 +27,10 @@ use crate::theme::{StyleThemeExt, Theme};
 use crate::view::{IntoView, View};
 use crate::views::{ContainerExt, Decorators, Empty, Label, Stack, StackExt, TooltipExt, canvas};
 
-/// The concrete renderer used inside the `floem` crate. All methods
-/// produce a `Box<dyn View>` wrapped inside a `Box<dyn Any>` so inspector
-/// call sites can downcast back to `Box<dyn View>`.
+/// Namespace for floem's inspector preview builders. Each method produces a
+/// `Box<dyn View>` wrapped in a `Box<dyn Any>`; `prop_preview`'s `from_any`
+/// unwraps it. (The `Any` wrapping is a vestige of the former cross-crate
+/// renderer trait and is purely internal now.)
 pub struct FloemInspectorRender;
 
 fn erase_view(view: impl View + 'static) -> Box<dyn Any> {
@@ -39,31 +38,8 @@ fn erase_view(view: impl View + 'static) -> Box<dyn Any> {
     Box::new(view)
 }
 
-fn view_from_any(any: Box<dyn Any>) -> Box<dyn View> {
-    any.downcast::<Box<dyn View>>()
-        .ok()
-        .map(|b| *b)
-        .unwrap_or_else(|| Empty::new().into_any())
-}
-
-impl InspectorRender for FloemInspectorRender {
-    fn empty(&self) -> Box<dyn Any> {
-        erase_view(Empty::new())
-    }
-
-    fn text(&self, s: &str) -> Box<dyn Any> {
-        erase_view(Label::new(s))
-    }
-
-    fn sequence(&self, items: Vec<Box<dyn Any>>) -> Box<dyn Any> {
-        let views: Vec<Box<dyn View>> = items
-            .into_iter()
-            .filter_map(|any| any.downcast::<Box<dyn View>>().ok().map(|b| *b))
-            .collect();
-        erase_view(Stack::vertical_from_iter(views).style(|s| s.gap(4.0)))
-    }
-
-    fn color(&self, c: Color) -> Box<dyn Any> {
+impl FloemInspectorRender {
+    pub(crate) fn color(&self, c: Color) -> Box<dyn Any> {
         let color = c;
         let swatch = ()
             .style(move |s| {
@@ -154,7 +130,7 @@ impl InspectorRender for FloemInspectorRender {
         )
     }
 
-    fn gradient(&self, g: &Gradient) -> Box<dyn Any> {
+    pub(crate) fn gradient(&self, g: &Gradient) -> Box<dyn Any> {
         let box_width = 22.;
         let box_height = 14.;
         let mut grad = g.clone();
@@ -207,7 +183,7 @@ impl InspectorRender for FloemInspectorRender {
         )
     }
 
-    fn brush(&self, b: &Brush) -> Box<dyn Any> {
+    pub(crate) fn brush(&self, b: &Brush) -> Box<dyn Any> {
         match b {
             Brush::Solid(color) => self.color(*color),
             Brush::Gradient(grad) => self.gradient(grad),
@@ -215,7 +191,7 @@ impl InspectorRender for FloemInspectorRender {
         }
     }
 
-    fn stroke(&self, s: &Stroke) -> Box<dyn Any> {
+    pub(crate) fn stroke(&self, s: &Stroke) -> Box<dyn Any> {
         let stroke = s.clone();
         let clone = stroke.clone();
 
@@ -321,7 +297,7 @@ impl InspectorRender for FloemInspectorRender {
         )
     }
 
-    fn rect(&self, r: &Rect) -> Box<dyn Any> {
+    pub(crate) fn rect(&self, r: &Rect) -> Box<dyn Any> {
         let r = *r;
 
         let w = r.x1 - r.x0;
@@ -362,7 +338,7 @@ impl InspectorRender for FloemInspectorRender {
         )
     }
 
-    fn affine(&self, a: &Affine) -> Box<dyn Any> {
+    pub(crate) fn affine(&self, a: &Affine) -> Box<dyn Any> {
         let affine = *a;
         let coeffs = affine.as_coeffs();
 
@@ -512,7 +488,7 @@ impl InspectorRender for FloemInspectorRender {
         )
     }
 
-    fn object_fit(&self, f: ObjectFit) -> Box<dyn Any> {
+    pub(crate) fn object_fit(&self, f: ObjectFit) -> Box<dyn Any> {
         use peniko::kurbo::RoundedRect;
 
         let object_fit = f;
@@ -654,7 +630,7 @@ impl InspectorRender for FloemInspectorRender {
         )
     }
 
-    fn object_position(&self, p: &ObjectPosition) -> Box<dyn Any> {
+    pub(crate) fn object_position(&self, p: &ObjectPosition) -> Box<dyn Any> {
         use peniko::kurbo::{Circle, RoundedRect};
 
         let object_position = *p;
@@ -790,7 +766,7 @@ impl InspectorRender for FloemInspectorRender {
         )
     }
 
-    fn transition(&self, t: &Transition) -> Box<dyn Any> {
+    pub(crate) fn transition(&self, t: &Transition) -> Box<dyn Any> {
         let transition = t.clone();
         let easing_clone = transition.easing.clone();
 
@@ -929,44 +905,17 @@ impl InspectorRender for FloemInspectorRender {
         )
     }
 
-    fn muted_text(&self, s: &str) -> Box<dyn Any> {
-        erase_view(
-            Label::new(s.to_string()).style(|s| s.with_theme(|s, t| s.color(t.text_muted()))),
-        )
-    }
-
-    fn labelled(&self, label: &str, content: Box<dyn Any>) -> Box<dyn Any> {
-        let index_label = Label::new(label.to_string())
-            .style(|s| s.with_theme(|s, t| s.color(t.text_muted())));
-        let content_view = view_from_any(content);
-        erase_view(
-            Stack::new((index_label, content_view))
-                .style(|s| s.items_center().gap(8.0).padding(4.0)),
-        )
-    }
-
-    fn vertical_list(&self, items: Vec<Box<dyn Any>>) -> Box<dyn Any> {
-        let views: Vec<Box<dyn View>> = items.into_iter().map(view_from_any).collect();
-        erase_view(Stack::vertical_from_iter(views).style(|s| s.gap(4.0)))
-    }
-
-    fn horizontal_pair(&self, first: Box<dyn Any>, second: Box<dyn Any>) -> Box<dyn Any> {
-        let first = view_from_any(first);
-        let second = view_from_any(second);
-        erase_view(Stack::new((first, second)).style(|s| s.gap(8.0)))
-    }
-
-    fn font_weight(&self, weight: FontWeight, label: &str) -> Box<dyn Any> {
+    pub(crate) fn font_weight(&self, weight: FontWeight, label: &str) -> Box<dyn Any> {
         let w = weight;
         erase_view(Label::new(label.to_string()).style(move |s| s.font_weight(w)))
     }
 
-    fn font_style(&self, style: FontStyle, label: &str) -> Box<dyn Any> {
+    pub(crate) fn font_style(&self, style: FontStyle, label: &str) -> Box<dyn Any> {
         let fs = style;
         erase_view(Label::new(label.to_string()).style(move |s| s.font_style(fs)))
     }
 
-    fn border(&self, b: &Border) -> Box<dyn Any> {
+    pub(crate) fn border(&self, b: &Border) -> Box<dyn Any> {
         let border = b.clone();
         let sides = [
             ("Left:", border.left),
@@ -980,8 +929,7 @@ impl InspectorRender for FloemInspectorRender {
             .filter_map(|(l, v)| v.map(|v| (l, v)))
             .map(|(label, value)| {
                 let child: Box<dyn View> = value
-                    .debug_view(self)
-                    .and_then(|any| any.downcast::<Box<dyn View>>().ok().map(|b| *b))
+                    .debug_view()
                     .unwrap();
                 Stack::horizontal((
                     label.style(|s| s.font_weight(FontWeight::BOLD).width(80.0)),
@@ -998,7 +946,7 @@ impl InspectorRender for FloemInspectorRender {
         Box::new(view)
     }
 
-    fn border_color(&self, bc: &BorderColor) -> Box<dyn Any> {
+    pub(crate) fn border_color(&self, bc: &BorderColor) -> Box<dyn Any> {
         let border_color = bc.clone();
         let sides = [
             ("Left:", border_color.left),
@@ -1012,8 +960,7 @@ impl InspectorRender for FloemInspectorRender {
             .filter_map(|(l, v)| v.map(|v| (l, v)))
             .map(|(label, color)| {
                 let child: Box<dyn View> = color
-                    .debug_view(self)
-                    .and_then(|any| any.downcast::<Box<dyn View>>().ok().map(|b| *b))
+                    .debug_view()
                     .unwrap();
                 Stack::horizontal((
                     label.style(|s| s.font_weight(FontWeight::BOLD).width(80.0)),
@@ -1030,7 +977,7 @@ impl InspectorRender for FloemInspectorRender {
         Box::new(view)
     }
 
-    fn border_radius(&self, br: &BorderRadius) -> Box<dyn Any> {
+    pub(crate) fn border_radius(&self, br: &BorderRadius) -> Box<dyn Any> {
         let border_radius = *br;
         let corners = [
             ("Top Left:", border_radius.top_left),
@@ -1044,8 +991,7 @@ impl InspectorRender for FloemInspectorRender {
             .filter_map(|(l, v)| v.map(|v| (l, v)))
             .map(|(label, radius)| {
                 let child: Box<dyn View> = radius
-                    .debug_view(self)
-                    .and_then(|any| any.downcast::<Box<dyn View>>().ok().map(|b| *b))
+                    .debug_view()
                     .unwrap();
                 Stack::horizontal((
                     label.style(|s| s.font_weight(FontWeight::BOLD).width(80.0)),
@@ -1062,7 +1008,7 @@ impl InspectorRender for FloemInspectorRender {
         Box::new(view)
     }
 
-    fn padding(&self, p: &Padding) -> Box<dyn Any> {
+    pub(crate) fn padding(&self, p: &Padding) -> Box<dyn Any> {
         let padding = *p;
         let sides = [
             ("Left:", padding.left),
@@ -1076,8 +1022,7 @@ impl InspectorRender for FloemInspectorRender {
             .filter_map(|(l, v)| v.map(|v| (l, v)))
             .map(|(label, padding)| {
                 let child: Box<dyn View> = padding
-                    .debug_view(self)
-                    .and_then(|any| any.downcast::<Box<dyn View>>().ok().map(|b| *b))
+                    .debug_view()
                     .unwrap();
                 Stack::horizontal((
                     label.style(|s| s.font_weight(FontWeight::BOLD).width(80.0)),
@@ -1094,7 +1039,7 @@ impl InspectorRender for FloemInspectorRender {
         Box::new(view)
     }
 
-    fn margin(&self, m: &Margin) -> Box<dyn Any> {
+    pub(crate) fn margin(&self, m: &Margin) -> Box<dyn Any> {
         let margin = *m;
         let sides = [
             ("Left:", margin.left),
@@ -1108,8 +1053,7 @@ impl InspectorRender for FloemInspectorRender {
             .filter_map(|(l, v)| v.map(|v| (l, v)))
             .map(|(label, margin)| {
                 let child: Box<dyn View> = margin
-                    .debug_view(self)
-                    .and_then(|any| any.downcast::<Box<dyn View>>().ok().map(|b| *b))
+                    .debug_view()
                     .unwrap();
                 Stack::horizontal((
                     label.style(|s| s.font_weight(FontWeight::BOLD).width(80.0)),
@@ -1126,7 +1070,7 @@ impl InspectorRender for FloemInspectorRender {
         Box::new(view)
     }
 
-    fn box_shadow(&self, s: &BoxShadow) -> Box<dyn Any> {
+    pub(crate) fn box_shadow(&self, s: &BoxShadow) -> Box<dyn Any> {
         // Create a preview container that shows a visual representation of the shadow
         let shadow = *s;
 
@@ -1148,11 +1092,7 @@ impl InspectorRender for FloemInspectorRender {
         // can't hold `&dyn InspectorRender` inside a 'static closure, so
         // reach for the concrete floem renderer.
         let details_view = move || {
-            let color_view: Box<dyn View> = shadow
-                .color
-                .debug_view(&FloemInspectorRender)
-                .and_then(|any| any.downcast::<Box<dyn View>>().ok().map(|b| *b))
-                .unwrap();
+            let color_view: Box<dyn View> = shadow.color.debug_view().unwrap();
             Stack::vertical((
                 Stack::horizontal((
                     "Color:".style(|s| s.font_weight(FontWeight::BOLD).width(80.0)),
@@ -1193,11 +1133,10 @@ impl InspectorRender for FloemInspectorRender {
 }
 
 /// Inspector preview for [`DesignSystem`]: an expandable panel listing
-/// colors and spacing. Defined here (floem core) rather than on the
-/// engine's `InspectorRender` trait because the widget body is
-/// floem-view-specific and the type itself is floem-specific.
+/// colors and spacing. A floem-specific type with a floem-view body, so its
+/// preview lives here rather than in the engine.
 impl PropDebugView for DesignSystem {
-    fn debug_view(&self, r: &dyn InspectorRender) -> Option<Box<dyn Any>> {
+    fn debug_view(&self) -> Option<Box<dyn View>> {
         use crate::prelude::*;
         use crate::views::Stack;
 
@@ -1205,10 +1144,7 @@ impl PropDebugView for DesignSystem {
         let is_expanded = RwSignal::new(false);
 
         let color_swatch = |label: &str, color: Color| {
-            let swatch: Box<dyn View> = color
-                .debug_view(r)
-                .and_then(|any| any.downcast::<Box<dyn View>>().ok().map(|b| *b))
-                .unwrap();
+            let swatch: Box<dyn View> = color.debug_view().unwrap();
             Stack::new((
                 label.to_string().style(|s| s.width(120.0).font_size(12.0)),
                 swatch,
@@ -1291,8 +1227,7 @@ impl PropDebugView for DesignSystem {
                 .flex_shrink(1.)
         });
 
-        let view: Box<dyn View> = content.into_any();
-        Some(Box::new(view))
+        Some(content.into_any())
     }
 }
 

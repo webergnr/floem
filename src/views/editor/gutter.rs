@@ -80,7 +80,7 @@ impl View for EditorGutterView {
 
     fn style_pass(&mut self, cx: &mut crate::context::StyleCx<'_>) {
         let mut transitioning = false;
-        if self.gutter_style.read(cx, &mut transitioning) {
+        if self.gutter_style.read(cx.extractor_cx(), &mut transitioning) {
             cx.window_state.request_paint(self.id());
         }
         if transitioning {

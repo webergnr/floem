@@ -558,12 +558,14 @@ impl<'a> StyleCx<'a> {
     }
 }
 
-impl floem_style::PropExtractorCx for StyleCx<'_> {
-    fn now(&self) -> Instant {
-        self.now
-    }
-    fn direct_style(&self) -> &Style {
-        &self.direct
+impl StyleCx<'_> {
+    /// Build the narrow input bundle the `prop_extractor!` macros need.
+    /// Cheap — just bundles `now` + a borrow of `direct`.
+    pub fn extractor_cx(&self) -> floem_style::PropExtractorCx<'_> {
+        floem_style::PropExtractorCx {
+            now: self.now,
+            direct_style: &self.direct,
+        }
     }
 }
 

@@ -1422,11 +1422,24 @@ impl WindowState {
             // Assemble the cascade inputs from self's fields. Pulling
             // everything out first lets the interaction closure borrow
             // only what it needs without tangling with `self` as a
-            // whole. The animation backend stays a small stack value
-            // that borrows the reverse map read-only.
+            // whole. The animation hook is a closure that borrows the
+            // reverse map read-only.
             let reverse_map = &self.style_node_to_view;
-            let anim_backend = crate::style::animation_backend::FloemAnimationBackend {
-                style_node_to_view: reverse_map,
+            // Animation hook: find the owning view for the node and tick
+            // its `ViewState.animations` stack, folding results into
+            // `combined`/`interact`. Mutation goes through `ViewState`'s
+            // `RefCell`, so a shared `Fn` closure is honest.
+            let animations = |node: floem_style::StyleNodeId,
+                              combined: &mut floem_style::Style,
+                              interact: &mut floem_style::InteractionState|
+             -> bool {
+                let Some(view_id) = reverse_map.get(&node).copied() else {
+                    return false;
+                };
+                view_id
+                    .state()
+                    .borrow_mut()
+                    .apply_animations(combined, interact)
             };
             let interactions =
                 |node: floem_style::StyleNodeId| -> floem_style::PerNodeInteraction {
@@ -1451,7 +1464,7 @@ impl WindowState {
                 default_theme_classes: &self.default_theme,
                 default_theme_inherited: &self.default_theme_inherited,
                 interactions: &interactions,
-                animations: &anim_backend,
+                animations: &animations,
             };
             tree.compute_style(root_style_node, &inputs);
             drop(inputs);

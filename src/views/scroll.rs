@@ -110,7 +110,7 @@ impl ScrollHandle {
             .window_state
             .ensure_style_node_for_element(self.element_id);
         let mut transitioning = false;
-        if self.style.read_style(cx, &resolved, &mut transitioning) {
+        if self.style.read_style(cx.extractor_cx(), &resolved, &mut transitioning) {
             self.element_id.owning_id().request_paint();
         }
         if transitioning {
@@ -339,7 +339,7 @@ impl ScrollTrack {
             .window_state
             .ensure_style_node_for_element(self.element_id);
         let mut transitioning = false;
-        if self.style.read_style(cx, &resolved, &mut transitioning) {
+        if self.style.read_style(cx.extractor_cx(), &resolved, &mut transitioning) {
             self.element_id.owning_id().request_paint();
         }
         if transitioning {
@@ -947,7 +947,7 @@ impl View for Scroll {
 
     fn style_pass(&mut self, cx: &mut crate::context::StyleCx<'_>) {
         let mut transitioning = false;
-        self.scroll_style.read(cx, &mut transitioning);
+        self.scroll_style.read(cx.extractor_cx(), &mut transitioning);
         if transitioning {
             cx.request_transition();
         }

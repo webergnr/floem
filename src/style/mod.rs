@@ -138,7 +138,7 @@ use crate::prop_extractor;
 mod custom;
 mod cx;
 mod inspector_render_impl;
-pub(crate) mod animation_backend;
+mod prop_preview;
 pub mod design_system;
 mod storage;
 mod style_debug_ext;
@@ -154,8 +154,8 @@ pub use floem_style::{CursorStyle, Focus, NoWrapOverflow, PointerEvents, TextOve
 pub use floem_style::{Border, BorderColor, BorderRadius, BoxShadow, Margin, Padding};
 pub use custom::{CustomStylable, CustomStyle, StyleCustomExt};
 pub use cx::{InheritedInteractionCx, InteractionState, StyleCx};
-pub use floem_style::{InspectorRender, PropDebugView};
-pub use inspector_render_impl::FloemInspectorRender;
+pub use prop_preview::{register_prop_preview, PropDebugView};
+pub(crate) use inspector_render_impl::FloemInspectorRender;
 pub use floem_style::{
     ExtractorField, StyleClass, StyleClassInfo, StyleClassRef, StyleDebugGroup,
     StyleDebugGroupInfo, StyleDebugGroupRef, StyleKey, StyleKeyInfo, StyleProp, StylePropInfo,

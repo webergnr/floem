@@ -16,7 +16,7 @@
 
 #[macro_export]
 macro_rules! style_debug_group {
-    ($(#[$meta:meta])* $v:vis $name:ident $(, inherited = $inherited:ident)?, members = [$($prop:ty),* $(,)?], view = $view:path) => {
+    ($(#[$meta:meta])* $v:vis $name:ident $(, inherited = $inherited:ident)?, members = [$($prop:ty),* $(,)?] $(,)?) => {
         $(#[$meta])*
         #[derive(Default, Copy, Clone)]
         $v struct $name;
@@ -28,14 +28,6 @@ macro_rules! style_debug_group {
                         $crate::StyleDebugGroupInfo::new::<$name>(
                             $crate::style_debug_group!(@inherited $($inherited)?),
                             || vec![$(<$prop as $crate::StyleProp>::key()),*],
-                            |style| {
-                                let style = style
-                                    .downcast_ref::<$crate::Style>()
-                                    .expect("debug_view called with non-Style argument");
-                                $view(style).map(|view| {
-                                    Box::new(view) as Box<dyn std::any::Any>
-                                })
-                            },
                         )
                     );
                 $crate::StyleKey { info: &INFO }
@@ -43,13 +35,6 @@ macro_rules! style_debug_group {
 
             fn member_props() -> Vec<$crate::StyleKey> {
                 vec![$(<$prop as $crate::StyleProp>::key()),*]
-            }
-
-            fn debug_view(style: &dyn std::any::Any) -> Option<Box<dyn std::any::Any>> {
-                let style = style
-                    .downcast_ref::<$crate::Style>()
-                    .expect("debug_view called with non-Style argument");
-                $view(style).map(|view| Box::new(view) as Box<dyn std::any::Any>)
             }
         }
     };
@@ -119,14 +104,14 @@ macro_rules! prop {
                             )
                         }
                     },
-                    debug_view: |val, r| {
+                    value_as_any: |val| {
                         if let Some(v) = val.downcast_ref::<$crate::StyleMapValue<$ty>>() {
                             match v {
                                 $crate::StyleMapValue::Val(v) | $crate::StyleMapValue::Animated(v) => {
-                                    <$ty as $crate::PropDebugView>::debug_view(v, r)
+                                    $crate::PropValueRef::Val(v as &dyn std::any::Any)
                                 }
-                                $crate::StyleMapValue::Context(_) => Some(r.text("Context(..)")),
-                                $crate::StyleMapValue::Unset => Some(r.text("Unset")),
+                                $crate::StyleMapValue::Context(_) => $crate::PropValueRef::Context,
+                                $crate::StyleMapValue::Unset => $crate::PropValueRef::Unset,
                             }
                         } else {
                             panic!(
@@ -235,7 +220,7 @@ macro_rules! prop_extractor {
 
         impl $name {
             /// Read every field of this extractor from `style`, advancing
-            /// any in-flight transitions against `cx.now()`. Returns
+            /// any in-flight transitions against `cx.now`. Returns
             /// whether the aggregate resolved value changed. Sets
             /// `*transitioning` to `true` if any field is still animating
             /// after this pass — the caller is expected to schedule a
@@ -243,31 +228,26 @@ macro_rules! prop_extractor {
             #[allow(dead_code)]
             $vis fn read_style(
                 &mut self,
-                cx: &dyn $crate::PropExtractorCx,
+                cx: $crate::PropExtractorCx<'_>,
                 style: &$crate::Style,
                 transitioning: &mut bool,
             ) -> bool {
-                let now = $crate::PropExtractorCx::now(cx);
                 let mut changed = false;
                 $(
-                    changed |= self.$field.read(style, &now, transitioning);
+                    changed |= self.$field.read(style, &cx.now, transitioning);
                 )*
                 changed
             }
 
-            /// Read every field of this extractor from `cx.direct_style()`.
+            /// Read every field of this extractor from `cx.direct_style`.
             /// See [`read_style`] for the transition contract.
             #[allow(dead_code)]
             $vis fn read(
                 &mut self,
-                cx: &dyn $crate::PropExtractorCx,
+                cx: $crate::PropExtractorCx<'_>,
                 transitioning: &mut bool,
             ) -> bool {
-                self.read_explicit(
-                    $crate::PropExtractorCx::direct_style(cx),
-                    &$crate::PropExtractorCx::now(cx),
-                    transitioning,
-                )
+                self.read_explicit(cx.direct_style, &cx.now, transitioning)
             }
 
             #[allow(dead_code)]

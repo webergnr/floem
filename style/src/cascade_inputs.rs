@@ -2,11 +2,12 @@
 //! call time.
 //!
 //! [`compute_style`](crate::StyleTree::compute_style) matches taffy's
-//! shape: reads flow in through [`CascadeInputs`] (values + one closure
-//! for per-node interaction state), and the only host-pluggable
-//! during-cascade callback is [`AnimationBackend`] — the hook a native
-//! host overrides to delegate animation ticking to the platform's
-//! compositor instead of the tree's CPU ticker.
+//! shape: reads flow in through [`CascadeInputs`] (values + two closures —
+//! one for per-node interaction state, one for the animation tick), and
+//! the only host-pluggable during-cascade callback is the
+//! [`animations`](CascadeInputs::animations) hook — a closure a native
+//! host can point at the platform's compositor to delegate animation
+//! ticking instead of the tree's CPU ticker.
 //!
 //! Everything else the cascade might want to tell the host — fixed-
 //! element transitions, dirtied descendants, layout invalidations,
@@ -40,54 +41,15 @@ pub struct PerNodeInteraction {
     pub is_file_hover: bool,
 }
 
-/// The animation policy hook.
-///
-/// `apply` runs during [`StyleTree::compute_style`] on every dirty node
-/// after the cascade has resolved `combined`, before inherited context
-/// is derived. Hosts that keep their own per-view animation registry
-/// (floem today, via `ViewState.animations`) tick them here and fold
-/// results into `combined`. Native-offload backends register the
-/// animation with the platform's compositor on first sight and return
-/// `false` afterwards — the compositor drives interpolation separately.
-///
-/// Returns `true` while any animation is still active. The cascade
-/// records the node in its schedule set so the host brings it back
-/// next frame.
-///
-/// Receives `&self` rather than `&mut self` because floem's impl
-/// mutates through `RefCell`-backed view state. Backends that need
-/// internal mutation use interior mutability (`RefCell`, `Cell`,
-/// atomics for native-shared state).
-///
-/// The default impl is a no-op — standalone hosts and tests that
-/// don't animate anything can omit it and the cascade sees no
-/// animation work.
-pub trait AnimationBackend {
-    fn apply(
-        &self,
-        _node: StyleNodeId,
-        _combined: &mut Style,
-        _interact: &mut InteractionState,
-    ) -> bool {
-        false
-    }
-}
-
-/// An [`AnimationBackend`] that does nothing. Handy when a host wants
-/// to use tree-stored animations exclusively, or for tests that don't
-/// exercise animations.
-pub struct NoAnimationBackend;
-impl AnimationBackend for NoAnimationBackend {}
-
 /// Everything [`StyleTree::compute_style`](crate::StyleTree::compute_style)
 /// needs from the host.
 ///
-/// Every read is a plain value (`Copy` or `&Style`) except the per-node
-/// interaction lookup, which has to call back into host state — that
-/// one comes through a closure. The single active policy callback is
-/// [`animations`](Self::animations); all other engine-detected facts
-/// land in tree-owned state the host drains after `compute_style`
-/// returns.
+/// Every read is a plain value (`Copy` or `&Style`) except the two
+/// callbacks that reach back into host state — the per-node interaction
+/// lookup and the animation tick — which come through closures. The
+/// animation tick ([`animations`](Self::animations)) is the only active
+/// policy callback; all other engine-detected facts land in tree-owned
+/// state the host drains after `compute_style` returns.
 pub struct CascadeInputs<'a> {
     /// Frame-wide time snapshot. Used for transition progress.
     pub frame_start: Instant,
@@ -108,8 +70,17 @@ pub struct CascadeInputs<'a> {
     /// Per-node interaction state. Called for every dirty node the
     /// cascade visits; returns the five pseudo-class bits.
     pub interactions: &'a dyn Fn(StyleNodeId) -> PerNodeInteraction,
-    /// Animation policy hook. Defaulting to `NoAnimationBackend` is
-    /// fine — hosts that don't animate don't need to wire anything
-    /// beyond that.
-    pub animations: &'a dyn AnimationBackend,
+    /// Animation policy hook. Runs during
+    /// [`compute_style`](crate::StyleTree::compute_style) on every dirty
+    /// node after the cascade resolves `combined` and before inherited
+    /// context is derived: it folds any host-driven animation for the
+    /// node into `combined`/`interact` and returns `true` while that
+    /// animation is still active (the cascade then reschedules the node).
+    /// Hosts that keep their own per-view registry (floem, via
+    /// `ViewState.animations`) tick it here; native-offload hosts hand the
+    /// animation to a compositor and return `false`. Mutation through a
+    /// shared `&` closure is fine via interior mutability (floem's view
+    /// state is `RefCell`-backed). Hosts that don't animate pass a no-op
+    /// (`&|_, _, _| false`).
+    pub animations: &'a dyn Fn(StyleNodeId, &mut Style, &mut InteractionState) -> bool,
 }

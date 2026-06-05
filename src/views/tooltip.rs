@@ -92,7 +92,7 @@ impl View for Tooltip {
 
     fn style_pass(&mut self, cx: &mut crate::context::StyleCx<'_>) {
         let mut transitioning = false;
-        self.style.read(cx, &mut transitioning);
+        self.style.read(cx.extractor_cx(), &mut transitioning);
         if self.overlay.borrow().is_some() && self.id.is_hidden() {
             let id = self.overlay.take().unwrap();
             self.hover_point = None;

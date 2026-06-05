@@ -26,7 +26,7 @@ use floem_style::builtin_props::{Background, FontSize};
 use floem_style::recalc::StyleReason;
 use floem_style::responsive::{ScreenSize, ScreenSizeBp};
 use floem_style::{
-    CascadeInputs, NoAnimationBackend, PerNodeInteraction, Style, StyleNodeId, StyleTree,
+    CascadeInputs, InteractionState, PerNodeInteraction, Style, StyleNodeId, StyleTree,
 };
 use peniko::color::palette::css;
 
@@ -137,7 +137,8 @@ impl MiniHost {
             }
         };
 
-        let anim = NoAnimationBackend;
+        let anim: &dyn Fn(StyleNodeId, &mut Style, &mut InteractionState) -> bool =
+            &|_, _, _| false;
         let inputs = CascadeInputs {
             frame_start: self.frame_time,
             screen_size_bp: self.screen_size_bp,
@@ -147,7 +148,7 @@ impl MiniHost {
             default_theme_classes: &self.default_classes,
             default_theme_inherited: &self.default_inherited,
             interactions: &interactions,
-            animations: &anim,
+            animations: anim,
         };
         self.tree.compute_style(root_node, &inputs);
         drop(inputs);

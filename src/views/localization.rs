@@ -58,10 +58,7 @@ impl PartialEq for LocaleMap {
 
 impl StylePropValue for LocaleMap {}
 impl PropDebugView for LocaleMap {
-    fn debug_view(
-        &self,
-        _r: &dyn crate::style::InspectorRender,
-    ) -> Option<Box<dyn std::any::Any>> {
+    fn debug_view(&self) -> Option<Box<dyn crate::view::View>> {
         use crate::prelude::*;
 
         let languages: Vec<String> = self.0.keys().map(|lang_id| lang_id.to_string()).collect();
@@ -97,7 +94,7 @@ impl PropDebugView for LocaleMap {
         })
         .into_any();
 
-        Some(Box::new(view))
+        Some(view)
     }
 }
 
@@ -464,7 +461,7 @@ impl View for L10n {
 
     fn style_pass(&mut self, cx: &mut crate::context::StyleCx<'_>) {
         let mut transitioning = false;
-        if self.locale.read(cx, &mut transitioning) {
+        if self.locale.read(cx.extractor_cx(), &mut transitioning) {
             self.has_format_value = false;
         }
         if !self.has_format_value
@@ -473,7 +470,7 @@ impl View for L10n {
             self.label_id.update_state(formatted);
             self.has_format_value = true;
         }
-        self.fallback.read(cx, &mut transitioning);
+        self.fallback.read(cx.extractor_cx(), &mut transitioning);
         if !self.has_format_value && !self.apply_fallback() {
             self.label_id.update_state(self.key.clone());
         }

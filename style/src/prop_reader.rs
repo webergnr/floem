@@ -110,27 +110,27 @@ where
 // PropExtractorCx
 // ============================================================================
 
-/// Narrow host interface the `prop_extractor!`-generated convenience
+/// Narrow input bundle the `prop_extractor!`-generated convenience
 /// methods (`read`, `read_style`) need.
 ///
-/// Hosts implement this on their per-view style context type (e.g.
-/// floem's `StyleCx`). A second host's context needs only to answer:
+/// Hosts build one inline at the call site from whatever per-view
+/// context they carry (floem's `StyleCx`, a non-floem driver's
+/// per-frame state, etc.). A second host's frame loop needs only to
+/// supply:
 ///
-/// - "what time is it?" for transition ticks ([`Self::now`]),
-/// - "what style am I extracting from?" for the no-arg `read`
-///   convenience ([`Self::direct_style`]).
+/// - a frame timestamp for transition ticks ([`Self::now`]),
+/// - the direct style the extractor reads from when no explicit one
+///   is passed to `read` ([`Self::direct_style`]).
 ///
 /// Transitions are reported as data: each generated method takes a
 /// `&mut bool` the extractor sets when a read is still animating, and
 /// the caller decides what to do (typically schedule a re-cascade on
 /// the node). No host callback fires during property extraction.
-///
-/// Keeps the `prop_extractor!` macro fully engine-defined — the
-/// macro's expansion references only this trait, never a host type.
-pub trait PropExtractorCx {
+#[derive(Clone, Copy)]
+pub struct PropExtractorCx<'a> {
     /// Frame timestamp used to advance in-flight transitions.
-    fn now(&self) -> Instant;
+    pub now: Instant,
     /// The merged direct style the extractor reads from when no
-    /// explicit style is passed.
-    fn direct_style(&self) -> &Style;
+    /// explicit style is passed to `read_style`.
+    pub direct_style: &'a Style,
 }

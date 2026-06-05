@@ -1461,14 +1461,14 @@ impl View for TextInput {
         let placeholder_style =
             cx.resolve_nested_maps(Style::new(), &[PlaceholderTextClass::class_ref()], self.id);
         self.placeholder_style
-            .read_style(cx, &placeholder_style, &mut transitioning);
+            .read_style(cx.extractor_cx(), &placeholder_style, &mut transitioning);
 
-        if self.font.read(cx, &mut transitioning) {
+        if self.font.read(cx.extractor_cx(), &mut transitioning) {
             self.layout_data.borrow_mut().clear_overflow_state();
             self.update_text_layout();
             self.id.request_layout();
         }
-        if self.style.read(cx, &mut transitioning) {
+        if self.style.read(cx.extractor_cx(), &mut transitioning) {
             cx.window_state.request_paint(self.id);
 
             // necessary to update the text layout attrs
@@ -1477,7 +1477,7 @@ impl View for TextInput {
         }
 
         self.selection_style
-            .read_style(cx, &style, &mut transitioning);
+            .read_style(cx.extractor_cx(), &style, &mut transitioning);
 
         if transitioning {
             cx.request_transition();

@@ -5,7 +5,6 @@
 //! `floem_style`'s own unit module).
 
 mod collections;
-mod debug_view_impls;
 mod peniko;
 mod primitives;
 mod taffy;

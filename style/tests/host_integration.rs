@@ -36,9 +36,8 @@ use floem_style::builtin_props::{Background, FontSize};
 use floem_style::responsive::ScreenSizeBp;
 use floem_style::unit::{Angle, Pt};
 use floem_style::{
-    AnimationBackend, CascadeInputs, InteractionState, LayoutProps, NoAnimationBackend,
-    PerNodeInteraction, PropExtractorCx, Style, StyleNodeId, StyleTree, TransformProps,
-    ViewStyleProps, recalc::StyleReason,
+    CascadeInputs, InteractionState, LayoutProps, PerNodeInteraction, PropExtractorCx, Style,
+    StyleNodeId, StyleTree, TransformProps, ViewStyleProps, recalc::StyleReason,
 };
 use peniko::color::palette::css;
 use peniko::kurbo;
@@ -58,7 +57,7 @@ struct MockHost {
     // Per-node state the cascade reads.
     hovered: std::collections::HashSet<StyleNodeId>,
 
-    // State PropExtractorCx reads through.
+    // State the extractor_cx() helper reads through.
     current_direct: Style,
 }
 
@@ -69,26 +68,25 @@ impl MockHost {
             ..Self::default()
         }
     }
-}
 
-impl PropExtractorCx for MockHost {
-    fn now(&self) -> Instant {
-        self.frame_start.unwrap()
-    }
-    fn direct_style(&self) -> &Style {
-        &self.current_direct
+    /// Build a `PropExtractorCx` bundle for the extractor read methods.
+    fn extractor_cx(&self) -> PropExtractorCx<'_> {
+        PropExtractorCx {
+            now: self.frame_start.unwrap(),
+            direct_style: &self.current_direct,
+        }
     }
 }
 
 /// Build a `CascadeInputs` for the current host state. Captures `host`
-/// immutably for the interactions closure and pairs with a
-/// `NoAnimationBackend`; scoping everything inside one call avoids
-/// tangling the closure's lifetime with the tree.
+/// immutably for the interactions closure and pairs with a no-op
+/// animation hook; scoping everything inside one call avoids tangling
+/// the closures' lifetimes with the tree.
 fn with_inputs<R>(
     host: &MockHost,
     f: impl FnOnce(CascadeInputs<'_>) -> R,
 ) -> R {
-    let anim = NoAnimationBackend;
+    let anim: &dyn Fn(StyleNodeId, &mut Style, &mut InteractionState) -> bool = &|_, _, _| false;
     let interactions = |node: StyleNodeId| PerNodeInteraction {
         is_hovered: host.hovered.contains(&node),
         ..Default::default()
@@ -102,7 +100,7 @@ fn with_inputs<R>(
         default_theme_classes: &host.default_classes,
         default_theme_inherited: &host.default_inherited,
         interactions: &interactions,
-        animations: &anim,
+        animations: anim,
     })
 }
 
@@ -170,7 +168,7 @@ fn layout_extractor_fills_taffy_style() {
     // Drive the extractor through `read_explicit` (no context needed).
     let mut layout = LayoutProps::default();
     let mut transitioning = false;
-    layout.read_explicit(computed, &host.now(), &mut transitioning);
+    layout.read_explicit(computed, &host.frame_start.unwrap(), &mut transitioning);
 
     assert_eq!(layout.font_size(), 14.0);
 
@@ -216,7 +214,7 @@ fn transform_extractor_through_prop_extractor_cx() {
     // through the `transitioning` out-param; the caller (this test)
     // would normally schedule a re-cascade on the owning node.
     let mut transitioning = false;
-    transform.read_style(&host as &dyn PropExtractorCx, &computed, &mut transitioning);
+    transform.read_style(host.extractor_cx(), &computed, &mut transitioning);
 
     // Rotation extracted — non-zero (we set 90°).
     assert!(transform.rotation().to_radians().abs() > 0.0);
@@ -247,7 +245,7 @@ fn view_style_extractor_reads_visual_props() {
 
     let computed = tree.computed_style(n).unwrap();
     let mut vs = ViewStyleProps::default();
-    vs.read_explicit(computed, &host.now(), &mut false);
+    vs.read_explicit(computed, &host.frame_start.unwrap(), &mut false);
 
     assert_eq!(vs.background(), Some(peniko::Brush::Solid(css::BLUE)));
 
@@ -318,28 +316,15 @@ fn hover_selector_switches_between_passes() {
     );
 }
 
-/// `AnimationBackend::apply` is the host's hook for injecting per-view
-/// animations into the cascade. Override it, confirm the tree invokes
-/// it every time it recomputes a node.
+/// The `animations` hook is the host's seam for injecting per-view
+/// animations into the cascade. Pass a counting closure, confirm the
+/// tree invokes it every time it recomputes a node.
 #[test]
 fn animation_backend_hook_is_invoked() {
-    struct AnimBackend {
-        anim_calls: Cell<usize>,
-    }
-    impl AnimationBackend for AnimBackend {
-        fn apply(
-            &self,
-            _node: StyleNodeId,
-            _combined: &mut Style,
-            _interact: &mut InteractionState,
-        ) -> bool {
-            self.anim_calls.set(self.anim_calls.get() + 1);
-            false
-        }
-    }
-
-    let backend = AnimBackend {
-        anim_calls: Cell::new(0),
+    let anim_calls = Cell::new(0);
+    let animations = |_: StyleNodeId, _: &mut Style, _: &mut InteractionState| -> bool {
+        anim_calls.set(anim_calls.get() + 1);
+        false
     };
     let host = MockHost::new();
 
@@ -357,14 +342,14 @@ fn animation_backend_hook_is_invoked() {
         default_theme_classes: &host.default_classes,
         default_theme_inherited: &host.default_inherited,
         interactions: &interactions,
-        animations: &backend,
+        animations: &animations,
     };
     tree.compute_style(n, &inputs);
 
     assert_eq!(
-        backend.anim_calls.get(),
+        anim_calls.get(),
         1,
-        "compute_style should invoke AnimationBackend::apply once per dirty node"
+        "compute_style should invoke the animations hook once per dirty node"
     );
 }
 
