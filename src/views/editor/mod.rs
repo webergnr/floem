@@ -772,6 +772,51 @@ impl Editor {
         self.style().line_height(self.id(), line)
     }
 
+    /// Whether line positions must be computed from real per-line heights.
+    /// Without wrapping every buffer line is one visual line, so the heights
+    /// come straight from the styling without forcing any text layout.
+    /// (With wrapping the editor still assumes a uniform line height.)
+    pub fn per_line_heights_active(&self) -> bool {
+        self.es
+            .with_untracked(|es| matches!(es.wrap_method(), WrapMethod::None))
+    }
+
+    /// The y of the top of `line`: the sum of every real line height above it.
+    /// Only exact under `WrapMethod::None`.
+    pub fn line_y_unwrapped(&self, line: usize) -> f64 {
+        let style = self.style();
+        let edid = self.id();
+        (0..line)
+            .map(|l| f64::from(style.line_height(edid, l)))
+            .sum()
+    }
+
+    /// The line whose vertical span contains `y`, walking real heights.
+    /// Only exact under `WrapMethod::None`.
+    pub fn line_at_y_unwrapped(&self, y: f64, last_line: usize) -> usize {
+        let style = self.style();
+        let edid = self.id();
+        let mut acc = 0.0;
+        for l in 0..=last_line {
+            acc += f64::from(style.line_height(edid, l));
+            if acc > y {
+                return l;
+            }
+        }
+        last_line
+    }
+
+    /// The height of the whole document: real per-line heights when they are
+    /// exact, the uniform grid otherwise.
+    pub fn total_height(&self) -> f64 {
+        let last = self.last_vline().get();
+        if self.per_line_heights_active() {
+            self.line_y_unwrapped(last + 1)
+        } else {
+            f64::from(self.line_height(0)) * (last + 1) as f64
+        }
+    }
+
     // === Line Information ===
 
     /// Iterate over the visual lines in the view, starting at the given line.
@@ -1042,24 +1087,30 @@ impl Editor {
 
     /// Get the actual (line, col) of a particular point within the editor.
     pub fn line_col_of_point_with_phantom(&self, point: Point) -> (usize, usize) {
-        let line_height = f64::from(self.style().line_height(self.id(), 0));
         let info = if point.y <= 0.0 {
             Some(self.first_rvline_info())
         } else {
             self.screen_lines
                 .with_untracked(|sl| {
                     sl.iter_line_info().find(|info| {
-                        info.vline_y <= point.y && info.vline_y + line_height >= point.y
+                        let h = f64::from(
+                            self.style()
+                                .line_height(self.id(), info.vline_info.rvline.line),
+                        );
+                        info.vline_y <= point.y && info.vline_y + h >= point.y
                     })
                 })
                 .map(|info| info.vline_info)
         };
         let info = info.unwrap_or_else(|| {
-            for (y_idx, info) in self.iter_rvlines(false, RVLine::default()).enumerate() {
-                let vline_y = y_idx as f64 * line_height;
-                if vline_y <= point.y && vline_y + line_height >= point.y {
+            // Walk real heights: with variable line heights y_idx * h is wrong.
+            let mut acc_y = 0.0;
+            for info in self.iter_rvlines(false, RVLine::default()) {
+                let h = f64::from(self.style().line_height(self.id(), info.rvline.line));
+                if acc_y <= point.y && acc_y + h >= point.y {
                     return info;
                 }
+                acc_y += h;
             }
 
             self.last_rvline_info()
@@ -1088,25 +1139,30 @@ impl Editor {
         mode: Mode,
         point: Point,
     ) -> ((usize, usize), bool, CursorAffinity) {
-        // TODO: this assumes that line height is constant!
-        let line_height = f64::from(self.style().line_height(self.id(), 0));
         let info = if point.y <= 0.0 {
             Some(self.first_rvline_info())
         } else {
             self.screen_lines
                 .with_untracked(|sl| {
                     sl.iter_line_info().find(|info| {
-                        info.vline_y <= point.y && info.vline_y + line_height >= point.y
+                        let h = f64::from(
+                            self.style()
+                                .line_height(self.id(), info.vline_info.rvline.line),
+                        );
+                        info.vline_y <= point.y && info.vline_y + h >= point.y
                     })
                 })
                 .map(|info| info.vline_info)
         };
         let info = info.unwrap_or_else(|| {
-            for (y_idx, info) in self.iter_rvlines(false, RVLine::default()).enumerate() {
-                let vline_y = y_idx as f64 * line_height;
-                if vline_y <= point.y && vline_y + line_height >= point.y {
+            // Walk real heights: with variable line heights y_idx * h is wrong.
+            let mut acc_y = 0.0;
+            for info in self.iter_rvlines(false, RVLine::default()) {
+                let h = f64::from(self.style().line_height(self.id(), info.rvline.line));
+                if acc_y <= point.y && acc_y + h >= point.y {
                     return info;
                 }
+                acc_y += h;
             }
 
             self.last_rvline_info()
@@ -1628,13 +1684,23 @@ pub fn normal_compute_screen_lines(
 ) -> ScreenLines {
     let lines = &editor.lines;
     let style = editor.style.get();
-    // TODO: don't assume universal line height!
+    let variable_heights = editor.per_line_heights_active();
     let line_height = style.line_height(editor.id(), 0);
 
     let (y0, y1) = base.with_untracked(|base| (base.active_viewport.y0, base.active_viewport.y1));
     // Get the start and end (visual) lines that are visible in the viewport
-    let min_vline = VLine((y0 / line_height as f64).floor() as usize);
-    let max_vline = VLine((y1 / line_height as f64).ceil() as usize);
+    let (min_vline, max_vline) = if variable_heights {
+        let last = editor.last_vline().get();
+        (
+            VLine(editor.line_at_y_unwrapped(y0, last)),
+            VLine(editor.line_at_y_unwrapped(y1, last) + 1),
+        )
+    } else {
+        (
+            VLine((y0 / line_height as f64).floor() as usize),
+            VLine((y1 / line_height as f64).ceil() as usize),
+        )
+    };
 
     let cache_rev = editor.doc.get().cache_rev().get();
     editor.lines.check_cache_rev(cache_rev);
@@ -1666,14 +1732,29 @@ pub fn normal_compute_screen_lines(
         )
         .take(count);
 
+    let mut acc_y = if variable_heights {
+        editor.line_y_unwrapped(min_vline.get())
+    } else {
+        0.0
+    };
     for (i, vline_info) in iter.enumerate() {
         rvlines.push(vline_info.rvline);
 
         let line_height = f64::from(style.line_height(editor.id(), vline_info.rvline.line));
 
-        let y_idx = min_vline.get() + i;
-        let vline_y = y_idx as f64 * line_height;
-        let line_y = vline_y - vline_info.rvline.line_index as f64 * line_height;
+        let (vline_y, line_y) = if variable_heights {
+            // Without wrapping rvline.line_index is 0: the line starts here.
+            let y = acc_y;
+            acc_y += line_height;
+            (y, y)
+        } else {
+            let y_idx = min_vline.get() + i;
+            let vline_y = y_idx as f64 * line_height;
+            (
+                vline_y,
+                vline_y - vline_info.rvline.line_index as f64 * line_height,
+            )
+        };
 
         // Add the information to make it cheap to get in the future.
         // This y positions are shifted by the baseline y0

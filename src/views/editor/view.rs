@@ -400,7 +400,7 @@ impl EditorView {
                         max_line_width.max(parent_size.width())
                     };
 
-                    let last_line_height = line_height * (editor.last_vline().get() + 1) as f64;
+                    let last_line_height = editor.total_height();
                     let height = last_line_height;
 
                     let margin_bottom =
