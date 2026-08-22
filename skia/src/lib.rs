@@ -505,11 +505,11 @@ impl Renderer for SkiaRenderer {
 
 fn image_transform(transform: Affine, rect: Rect, image: &peniko::ImageBrush) -> Affine {
     transform
+        .pre_translate((rect.min_x(), rect.min_y()).into())
         .pre_scale_non_uniform(
             rect.width().max(1.0) / image.image.width as f64,
             rect.height().max(1.0) / image.image.height as f64,
         )
-        .pre_translate((rect.min_x(), rect.min_y()).into())
 }
 
 fn image_brush_from_rgba(width: u32, height: u32, data: Vec<u8>) -> peniko::ImageBrush {
