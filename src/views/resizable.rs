@@ -100,6 +100,15 @@ prop!(
     /// Defaults to automatically handling the style for you.
     pub HandleCursorStyle: Option<CursorStyle> {} = None
 );
+prop!(
+    /// The length (along the handle) of a grip mark drawn centered on the
+    /// handle. Zero draws none.
+    pub HandleGripLength: Pt {} = Pt(0.)
+);
+prop!(
+    /// The color of the grip mark.
+    pub HandleGripColor: Brush {} = Brush::Solid(css::TRANSPARENT)
+);
 
 prop_extractor! {
     ReStyle {
@@ -112,6 +121,8 @@ prop_extractor! {
         thickness: HandleThickness,
         hit_test_thickness: HandleHitTestThickness,
         cursor: HandleCursorStyle,
+        grip_length: HandleGripLength,
+        grip_color: HandleGripColor,
     }
 }
 
@@ -363,6 +374,37 @@ impl Handle {
         };
 
         cx.fill(&paint_rect, &self.handle_style.color(), 0.);
+
+        // The grip mark: a small rounded bar centered on the handle, so the
+        // affordance travels with the divider instead of needing an overlay.
+        let grip_len = self.handle_style.grip_length().0;
+        if grip_len > 0.0 {
+            let grip = match axis {
+                Axis::Horizontal => {
+                    let center_y = (rect.y0 + rect.y1) / 2.0;
+                    Rect::new(
+                        paint_rect.x0,
+                        center_y - grip_len / 2.0,
+                        paint_rect.x1,
+                        center_y + grip_len / 2.0,
+                    )
+                }
+                Axis::Vertical => {
+                    let center_x = (rect.x0 + rect.x1) / 2.0;
+                    Rect::new(
+                        center_x - grip_len / 2.0,
+                        paint_rect.y0,
+                        center_x + grip_len / 2.0,
+                        paint_rect.y1,
+                    )
+                }
+            };
+            cx.fill(
+                &grip.to_rounded_rect(thickness / 2.0),
+                &self.handle_style.grip_color(),
+                0.,
+            );
+        }
     }
 }
 
@@ -590,6 +632,19 @@ impl ResizableCustomStyle {
     ///   If `None` is provided, default automatic cursor style is used.
     pub fn handle_cursor_style(mut self, cursor_style: impl Into<Option<CursorStyle>>) -> Self {
         self = ResizableCustomStyle(self.0.set(HandleCursorStyle, cursor_style));
+        self
+    }
+
+    /// Sets the length of the grip mark drawn centered on the handle.
+    /// Zero — the default — draws none.
+    pub fn handle_grip_length(mut self, length: impl Into<Pt>) -> Self {
+        self = ResizableCustomStyle(self.0.set(HandleGripLength, length));
+        self
+    }
+
+    /// Sets the color of the grip mark.
+    pub fn handle_grip_color(mut self, color: impl Into<Brush>) -> Self {
+        self = ResizableCustomStyle(self.0.set(HandleGripColor, color));
         self
     }
 }
