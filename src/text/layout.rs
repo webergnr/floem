@@ -796,7 +796,7 @@ impl TextLayout {
 
                 let props = GlyphRunProps::new(run.font())
                     .font_size(run.font_size())
-                    .hint(false)
+                    .hint(true)
                     .normalized_coords(run.normalized_coords())
                     .style(Fill::NonZero)
                     .brush(glyph_run.style().brush.0)
