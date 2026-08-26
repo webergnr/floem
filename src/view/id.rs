@@ -540,6 +540,14 @@ impl ViewId {
         VIEW_STORAGE.with_borrow(|s| s.root.get(*self).copied())
     }
 
+    /// Whether this id still names a view. `remove` drops the id from the slot
+    /// map last, so this is false for a view that has been cleaned up and true
+    /// for one that exists but has not been added to a parent yet — the two
+    /// cases `try_root` cannot tell apart.
+    pub(crate) fn is_live(&self) -> bool {
+        VIEW_STORAGE.with_borrow(|s| s.view_ids.contains_key(*self))
+    }
+
     /// Get the size of this View
     pub fn get_size(&self) -> Option<Size> {
         self.get_layout()

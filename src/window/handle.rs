@@ -670,6 +670,20 @@ impl WindowHandle {
             .copied()
             .collect();
         for id in has_layout_listener {
+            // ⚠️ a registration can outlive the view that made it, and can also
+            // arrive before that view is in the tree — `RegisterListener` is a
+            // deferred update message either way. A view built and dropped
+            // inside one update pass is registered AFTER `remove_view` has
+            // deregistered what the view had recorded, and a view still on its
+            // way in has no root yet. Both leave an id here that `box_tree`
+            // refuses to look up, and asking anyway took the whole window down
+            // with "all view ids are created with a root".
+            //
+            // Neither has a layout to report. Skip; a view that is merely early
+            // reports on the next commit, once it has a root.
+            if id.try_root().is_none() {
+                continue;
+            }
             if let Some(layout) = id.get_layout() {
                 let window_origin = id.get_layout_window_origin();
                 let new_box = kurbo::Rect::from_origin_size(
@@ -1305,8 +1319,15 @@ impl WindowHandle {
                         self.id.request_all();
                     }
                     UpdateMessage::RegisterListener(key, id) => {
-                        cx.window_state.listeners.entry(key).or_default().push(id);
-                        id.state().borrow_mut().registered_listener_keys.push(key);
+                        // ⚠️ and not for a view that is already gone. The
+                        // message is deferred, so a view removed between
+                        // registering and this point would be pushed onto a
+                        // list `remove_view` has finished cleaning — a stale id
+                        // nothing will ever take out again.
+                        if id.is_live() {
+                            cx.window_state.listeners.entry(key).or_default().push(id);
+                            id.state().borrow_mut().registered_listener_keys.push(key);
+                        }
                     }
                     UpdateMessage::RemoveListener(key, id) => {
                         if let Some(ids) = cx.window_state.listeners.get_mut(&key) {
