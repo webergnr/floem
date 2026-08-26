@@ -206,6 +206,13 @@ pub(crate) fn collect_visual_order(
     }
 }
 
+/// A transform with its translation on a whole device pixel — the grid the
+/// window is actually rasterised on. Rotation and scale are left alone.
+fn snap_to_device(transform: Affine) -> Affine {
+    let c = transform.as_coeffs();
+    Affine::new([c[0], c[1], c[2], c[3], c[4].round(), c[5].round()])
+}
+
 impl GlobalPaintCx<'_> {
     /// Build explicit paint order for entire view tree.
     ///
@@ -281,8 +288,21 @@ impl GlobalPaintCx<'_> {
         let clip = box_tree.clipped_local_clip(element_id.0);
         drop(box_tree);
 
-        // Set absolute transform on renderer
-        let device_transform = world_transform.then_scale(self.window_state.effective_scale());
+        // Set absolute transform on renderer, snapped to whole DEVICE pixels.
+        //
+        // ⚠️ a view laid out on a fraction of a pixel draws its 1 px border
+        // across two rows at half weight and stands its text on a half-row
+        // baseline. On a 2x screen half a logical pixel IS a whole device one,
+        // so it costs nothing and nobody sees it; on a 1x screen it is the
+        // difference between a line and a smudge — and flex distributes a
+        // fractional remainder down the tree, so the error accumulates and
+        // lands on the chrome furthest from the window origin.
+        //
+        // Only the translation moves, so nothing shifts by more than half a
+        // device pixel, and a scaled or rotated subtree keeps its matrix. This
+        // is what a browser does to a composited layer, for the same reason.
+        let device_transform =
+            snap_to_device(world_transform.then_scale(self.window_state.effective_scale()));
         self.paint_state
             .renderer_mut()
             .set_transform(device_transform);
